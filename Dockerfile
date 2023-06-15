@@ -1,6 +1,6 @@
 ### Commands to use this container:
-###    docker image build -t docker-exps .
-###    docker run -it --rm -v /home/nuc/docker_exps_data:/data docker-exps
+###    docker image build -t docker_exps .
+###    docker run -it --rm -v /home/nuc/docker_exps_home_dir:/home -p 48513:48513 docker_exps
 ###
 ###
 
@@ -15,10 +15,10 @@ LABEL version="0.0.1"
 LABEL description="Experiments with Docker"
 
 # Set working dir
-WORKDIR /app
+WORKDIR /code
 
 # Copy python src files
-COPY src src
+COPY src/docker_exps/app src/docker_exps/app
 COPY requirements.txt .
 COPY Makefile .
 
@@ -29,9 +29,11 @@ RUN apt-get update && \
 	pip install -r requirements.txt
 
 # Define env variables
-ENV DATA_DIR=/data
-ENV PYTHONPATH=/app/src
+ENV PYTHONPATH=/code
+ENV HOME_DIR=/home
+ENV FLASK_HOST="10.0.0.34"
+ENV FLASK_PORT="48513"
 
 # Run python process
 ENTRYPOINT [ "python3" ]
-CMD [ "src/docker-exps/main_docker.py" ]
+CMD [ "src/docker_exps/app.py" ]
