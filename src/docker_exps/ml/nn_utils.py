@@ -1,4 +1,7 @@
-from typing import Tuple
+
+from typing import Tuple, List, Union
+
+import numpy as np
 
 import torch
 from torch.nn import functional as F
@@ -35,6 +38,7 @@ def select_n_random(data, labels, n=100):
 
 def save_model(model, path):
     torch.save(model.state_dict(), path)
+
 
 def eval_classifier_test_acc(testloader,
                              net,

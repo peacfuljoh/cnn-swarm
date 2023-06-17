@@ -9,9 +9,11 @@ import torchvision.transforms as transforms
 
 import numpy as np
 
+from ossr_utils.io_utils import load_json, save_json
+
 from src.docker_exps.ml.nn_models import NNConvResNetRGB
 from src.docker_exps.ml.nn_utils import eval_classifier_test_acc
-from src.docker_exps.constants import TORCH_DATA_ROOT
+from src.docker_exps.constants import TORCH_DATA_ROOT, MODEL_INFO_FPATH
 
 
 
@@ -49,9 +51,10 @@ def train(trainloader,
     """Train"""
     epoch_loss = []
     num_train = len(trainloader) * trainloader.batch_size
-    n_update_board = (num_train / trainloader.batch_size) // 10
+    n_update_board = int((num_train / trainloader.batch_size) / 10)
 
     for epoch in range(num_epochs):  # loop over the dataset multiple times
+        print('\n===== Epoch ' + str(epoch) + ' =====')
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0): # start from 0'th (default) or desired item
             # get the inputs
@@ -73,14 +76,19 @@ def train(trainloader,
             loss_iter = loss.item()
             running_loss += loss_iter
 
+            # update tensorboard
             if i % n_update_board == (n_update_board - 1):
+                # train and test stats
+                num_exs = trainloader.batch_size * (i + 1)
+                num_batch_tot = epoch * num_train + num_exs
+                num_epochs = epoch + num_exs / num_train  # TODO: switch to using this
+                if testloader is not None:
+                    acc, acc_top3 = eval_classifier_test_acc(testloader, net, top_n=3)
+
+                # board entries
                 if board is not None:
-                    num_exs = trainloader.batch_size * (i + 1)
-                    num_batch_tot = epoch * num_train + num_exs
-                    num_epochs = epoch + num_exs / num_train # TODO: switch to using this
                     board.add_scalar('training loss', running_loss / num_exs, num_batch_tot)
                     if testloader is not None:
-                        acc, acc_top3 = eval_classifier_test_acc(testloader, net, top_n=3)
                         board.add_scalar('test accuracy', acc, num_batch_tot)
                         # board.add_scalar('test top-3 accuracy', acc_top3, num_batch_tot)
 
@@ -99,13 +107,16 @@ def train(trainloader,
 def get_cifar10_data(batch_size: int = 64,
                      train: bool = True,
                      test: bool = True,
-                     shuffle: bool = True):
+                     shuffle: bool = True,
+                     example_idxs_train: Optional[List[int]] = None):
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
     if train:
         trainset = torchvision.datasets.CIFAR10(root=TORCH_DATA_ROOT, train=True, download=True, transform=transform) # 50k
+        if example_idxs_train is not None:
+            trainset = torch.utils.data.Subset(trainset, range(example_idxs_train[0], example_idxs_train[1]))
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=shuffle, num_workers=2)
     else:
         trainset, trainloader = None, None
@@ -138,3 +149,14 @@ def init_net(lr,
         num_change_epochs = num_epochs // 3
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, [num_change_epochs, num_change_epochs * 2], gamma=0.1)
     return net, criterion, optimizer, scheduler
+
+def update_model_info_file(mode: str,
+                           model_info: dict):
+    if mode == 'insert':
+        model_id = model_info['model_id']
+        model_info_no_id = {key: val for key, val in model_info.items() if key != 'model_id'}
+        print('Performing an insert to the model info file\n  model_id: {}\n  content: {}'.format(model_id, model_info_no_id))
+        d = load_json(MODEL_INFO_FPATH)
+        d[model_id] = model_info_no_id
+        save_json(MODEL_INFO_FPATH, d)
+

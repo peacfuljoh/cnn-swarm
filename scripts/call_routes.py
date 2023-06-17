@@ -1,24 +1,24 @@
 
-import os
 import requests
 from pprint import pprint
+import time
 
 import numpy as np
 import matplotlib.pyplot as plt
 
 
-# URL_BASE = 'http://' + os.environ['FLASK_HOST'] + ':' + os.environ['FLASK_PORT']
-URL_BASE = 'http://10.0.0.34:48513/'
+URL_BASE = 'http://127.0.0.1:48515/'
 
 
-def main():
+def main_predict():
     # status
     res = requests.get(URL_BASE + 'status').json()
     pprint(res)
 
     # get example
     dictToSend = dict(
-        example_idxs=[3, 6]
+        example_idxs=[103, 110],
+        dataset_type='test'
     )
     res = requests.post(URL_BASE + 'get_examples', json=dictToSend)
     dictFromServer = res.json()
@@ -35,14 +35,34 @@ def main():
 
     # predict on example
     dictToSend = dict(
-        model_id='5a0s8ydf0a9s8dyf',
-        example=examples[:1].tolist()
+        model_id='cifar10_003',
+        examples=examples.tolist()
     )
     res = requests.post(URL_BASE + 'predict', json=dictToSend)
     dictFromServer = res.json()
     pprint(dictFromServer)
 
+def main_train():
+    # status
+    res = requests.get(URL_BASE + 'status').json()
+    pprint(res)
+
+    # train
+    model_id = str(int(time.time() * 1e6))
+    # model_id = '1687044056050585'
+    dictToSend = dict(
+        model_type="NNConvResNetRGB",
+        model_id=model_id,
+        example_idxs=[0, 1000],
+        train_opts=dict(num_epochs=1)
+    )
+    res = requests.post(URL_BASE + 'train', json=dictToSend)
+    dictFromServer = res.json()
+    pprint(dictFromServer)
+
+
 
 
 if __name__ == '__main__':
-    main()
+    main_predict()
+    main_train()

@@ -18,13 +18,18 @@ from flask import Flask, jsonify, request
 
 from ossr_utils.io_utils import save_json
 
-from app_utils import get_sys_stats
-from src.docker_exps.constants import CIFAR10_CLASSES, HOME_DIR, FLASK_HOST, FLASK_PORT, STATUS_FPATH
+from app_utils import get_sys_stats, is_range_list, is_valid_model_type, is_existing_model_id
+from src.docker_exps.constants import CIFAR10_CLASSES, STATUS_FPATH, DATASET_NAMES, MODEL_INFO_FPATH,\
+    DATASET_SUBSETS
 from src.docker_exps.ml.ml_ops import get_cifar10_data
+from src.docker_exps.ml.train import train_manager
+from src.docker_exps.ml.predict import predict_manager
 
 
-# init status file
+# init status and info files
 save_json(STATUS_FPATH, get_sys_stats(init=True))
+if not os.path.exists(MODEL_INFO_FPATH):
+    save_json(MODEL_INFO_FPATH, {})
 
 
 app = Flask(__name__)
@@ -42,65 +47,109 @@ def stats():
 def get_example():
     req_info = request.get_json(force=True)
     example_idxs: Union[list, int] = req_info['example_idxs'] # single int or list of index endpoints
+    data_subset: str = req_info['dataset_type']
 
     pprint(req_info)
 
+    try:
+        assert data_subset in DATASET_SUBSETS
+    except:
+        return jsonify(dict(exception='Specify valid data_subset.'))
+
     if isinstance(example_idxs, int):
         ex_mode = 'int'
-    elif isinstance(example_idxs, list) and len(example_idxs) == 2 and all(isinstance(ex, int) for ex in example_idxs):
+    elif is_range_list(example_idxs):
         ex_mode = 'list'
     else:
         return jsonify(dict(exception='Specify valid example_idxs.'))
-
-    trainset = get_cifar10_data(train=True, test=False)[0]
 
     if ex_mode == 'int':
         ex_idxs = [example_idxs]
     else:
         ex_idxs = list(range(example_idxs[0], example_idxs[1]))
 
+    if data_subset == 'train':
+        dataset = get_cifar10_data(train=True, test=False)[0]
+    if data_subset == 'test':
+        dataset = get_cifar10_data(train=False, test=True)[1]
+
     class_idxs: List[int] = []
     class_tags: List[str] = []
     examples: List[list] = []
     for i in ex_idxs:
-        example_, class_id_ = trainset[i]
+        example_, class_id_ = dataset[i]
         class_idxs.append(class_id_)
         class_tags.append(CIFAR10_CLASSES[class_id_])
         examples.append(example_.tolist())
 
-    res = dict(idxs=class_idxs, tags=class_tags, examples=examples)
+    res = dict(class_idxs=class_idxs, class_tags=class_tags, examples=examples)
     return jsonify(res)
 
 @app.route('/train', methods=['POST'])
 def train():
     req_info = request.get_json(force=True)
     model_type: str = req_info['model_type']
-    train_data_exs: int = req_info['num_exs']
+    model_id: str = req_info['model_id']
+    example_idxs = req_info.get('example_idxs') # List[int]
+    train_opts = req_info.get('train_opts') # dict
+
+    try:
+        assert isinstance(model_type, str)
+        assert is_valid_model_type(model_type)
+        assert isinstance(model_id, str)
+        assert not is_existing_model_id(model_id)
+        assert example_idxs is None or is_range_list(example_idxs)
+    except:
+        return jsonify(dict(status='An input arg is invalid (model_type, model_id, example_idxs).'))
 
     pprint(req_info)
 
     # TODO: spin up train job
+    train_manager(model_type, model_id, example_idxs=example_idxs, train_opts=train_opts)
 
-    res = dict(status='initiated')
+    res = dict(status='Initiated train job.')
     return jsonify(res)
 
 @app.route('/predict', methods=['POST'])
 def predict():
     req_info = request.get_json(force=True)
     model_id: str = req_info['model_id']
-    example: np.ndarray = np.array(req_info['example'])
+    examples: list = req_info['examples']
 
     temp = dict(model_id=model_id)
-    temp['examples.shape'] = example.shape
+    temp['examples.shape'] = np.array(examples).shape
     pprint(temp)
 
     # TODO: spin up predict job
-    pred_id = 0
-    pred_tag = CIFAR10_CLASSES[pred_id]
+    pred_ids = predict_manager(model_id, examples)
+    pred_tags = [CIFAR10_CLASSES[i] for i in pred_ids]
 
-    res = dict(idxs=[pred_id], tags=[pred_tag])
+    res = dict(class_idxs=pred_ids, class_tags=pred_tags)
     return jsonify(res)
+
+@app.route('/get_dataset_info', methods=['POST'])
+def get_dataset_stats():
+    req_info = request.get_json(force=True)
+    dataset_name: str = req_info['dataset_name']
+
+    assert dataset_name in DATASET_NAMES
+
+    if dataset_name == 'CIFAR10':
+        trainset, testset = get_cifar10_data()[:2]
+        ex, _ = trainset[0]
+
+        res = dict(
+            num_train=len(trainset),
+            num_test=len(testset),
+            ex_shape=ex.shape,
+            num_classes=len(np.unique(trainset.targets))
+        )
+        return jsonify(res)
+
+
 
 
 if __name__ == "__main__":
+    FLASK_HOST = os.environ['FLASK_HOST']
+    FLASK_PORT = int(os.environ['FLASK_PORT'])
     app.run(host=FLASK_HOST, port=FLASK_PORT, debug=True)
