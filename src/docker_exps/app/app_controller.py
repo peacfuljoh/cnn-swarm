@@ -1,5 +1,5 @@
 """
-Flask app
+Flask app for controlling ML operations
 
 Run at command line:
     FLASK_HOST=10.0.0.34 FLASK_PORT=48513 HOME_DIR=/home/nuc/docker_exps_home_dir/ python src/docker_exps/app/app.py
@@ -12,22 +12,31 @@ from typing import Union, List
 import os
 from pprint import pprint
 
-import pandas as pd
 import numpy as np
 from flask import Flask, jsonify, request
+import requests
 
-from ossr_utils.io_utils import save_json
+from ossr_utils.io_utils import save_json, load_json
 
-from app_utils import get_sys_stats, is_range_list, is_valid_model_type, is_existing_model_id
-from src.docker_exps.constants import CIFAR10_CLASSES, STATUS_FPATH, DATASET_NAMES, MODEL_INFO_FPATH,\
+from src.docker_exps.utils.app_utils import is_range_list, is_valid_model_type, is_existing_model_id, preprocess_train_route_args
+from src.docker_exps.constants import CIFAR10_CLASSES, DATASET_NAMES, MODEL_INFO_FPATH, \
     DATASET_SUBSETS
+from src.docker_exps.constants_network import URL_TRAIN_INTERNAL
 from src.docker_exps.ml.ml_ops import get_cifar10_data
-from src.docker_exps.ml.train import train_manager
 from src.docker_exps.ml.predict import predict_manager
 
 
-# init status and info files
-save_json(STATUS_FPATH, get_sys_stats(init=True))
+CONTROLLER_STATUS = dict(
+    train_jobs=[],
+    predict_jobs=[],
+    nodes=dict(
+        train=[],
+        pred=[]
+    )
+)
+
+
+# init model info file if it doesn't exist
 if not os.path.exists(MODEL_INFO_FPATH):
     save_json(MODEL_INFO_FPATH, {})
 
@@ -39,9 +48,8 @@ def home():
     return '<h3>Hello. The app is running.</h3>'
 
 @app.route('/status')
-def stats():
-    res = get_sys_stats()
-    return jsonify(res)
+def status():
+    return jsonify(CONTROLLER_STATUS)
 
 @app.route('/get_examples', methods=['POST'])
 def get_example():
@@ -88,27 +96,13 @@ def get_example():
 @app.route('/train', methods=['POST'])
 def train():
     req_info = request.get_json(force=True)
-    model_type: str = req_info['model_type']
-    model_id: str = req_info['model_id']
-    example_idxs = req_info.get('example_idxs') # List[int]
-    train_opts = req_info.get('train_opts') # dict
-
-    try:
-        assert isinstance(model_type, str)
-        assert is_valid_model_type(model_type)
-        assert isinstance(model_id, str)
-        assert not is_existing_model_id(model_id)
-        assert example_idxs is None or is_range_list(example_idxs)
-    except:
-        return jsonify(dict(status='An input arg is invalid (model_type, model_id, example_idxs).'))
-
+    req_info = preprocess_train_route_args(req_info)
+    if 'exception' in req_info:
+        return jsonify(req_info)
     pprint(req_info)
-
-    # TODO: spin up train job
-    train_manager(model_type, model_id, example_idxs=example_idxs, train_opts=train_opts)
-
-    res = dict(status='Initiated train job.')
-    return jsonify(res)
+    res = requests.post(URL_TRAIN_INTERNAL + 'train', json=req_info)
+    dictFromServer = res.json()
+    return jsonify(dictFromServer)
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -130,9 +124,12 @@ def predict():
 @app.route('/get_dataset_info', methods=['POST'])
 def get_dataset_stats():
     req_info = request.get_json(force=True)
-    dataset_name: str = req_info['dataset_name']
+    dataset_name: str = req_info.get('dataset_name')
 
-    assert dataset_name in DATASET_NAMES
+    try:
+        assert dataset_name in DATASET_NAMES
+    except:
+        return jsonify(dict(exception='The dataset_name argument is invalid.'))
 
     if dataset_name == 'CIFAR10':
         trainset, testset = get_cifar10_data()[:2]
@@ -146,10 +143,15 @@ def get_dataset_stats():
         )
         return jsonify(res)
 
+@app.route('/get_model_info')
+def get_model_info():
+    model_info = load_json(MODEL_INFO_FPATH)
+    return jsonify(model_info)
 
 
 
 if __name__ == "__main__":
-    FLASK_HOST = os.environ['FLASK_HOST']
-    FLASK_PORT = int(os.environ['FLASK_PORT'])
+    FLASK_HOST = os.environ['FLASK_CONTROLLER_HOST']
+    FLASK_PORT = int(os.environ['FLASK_CONTROLLER_PORT'])
     app.run(host=FLASK_HOST, port=FLASK_PORT, debug=True)
+

@@ -1,9 +1,3 @@
-### Commands to use this container:
-###    docker image build -t docker_exps .
-###    docker run -it --rm -v --detach /home/nuc/docker_exps_home_dir:/home -p 48513:48513 docker_exps
-###
-###
-
 # Download base image ubuntu 22.04
 FROM ubuntu:22.04
 
@@ -12,7 +6,7 @@ MAINTAINER Johannes Traa
 
 # extra metadata
 LABEL version="0.0.1"
-LABEL description="Experiments with Docker"
+LABEL description="Experiments with Docker - ML controller"
 
 # Set working dir
 WORKDIR /code
@@ -33,10 +27,10 @@ COPY src/docker_exps src/docker_exps
 # Define env variables
 ENV PYTHONPATH=/code
 ENV HOME_DIR=/home
-ENV FLASK_HOST="0.0.0.0"
-ENV FLASK_PORT="48515"
+ENV FLASK_CONTROLLER_HOST="0.0.0.0"
+ENV FLASK_CONTROLLER_PORT="48515"
 
 # Run python process
 ENTRYPOINT [ "python3" ]
-CMD [ "src/docker_exps/app/app.py" ]
+CMD [ "src/docker_exps/app/app_controller.py" ]
 

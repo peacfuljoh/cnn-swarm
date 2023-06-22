@@ -1,0 +1,36 @@
+# Download base image ubuntu 22.04
+FROM ubuntu:22.04
+
+# author
+MAINTAINER Johannes Traa
+
+# extra metadata
+LABEL version="0.0.1"
+LABEL description="Experiments with Docker - ML model training node"
+
+# Set working dir
+WORKDIR /code
+
+# Copy setup files
+COPY requirements.txt .
+COPY Makefile .
+
+# Install all packages
+RUN apt-get update && \
+    apt-get install -y python3 && \
+    apt install -y python3-pip && \
+	pip install -r requirements.txt
+
+# Copy Python code
+COPY src/docker_exps src/docker_exps
+
+# Define env variables
+ENV PYTHONPATH=/code
+ENV HOME_DIR=/home
+ENV FLASK_TRAIN_HOST="0.0.0.0"
+ENV FLASK_TRAIN_PORT="48516"
+
+# Run python process
+ENTRYPOINT [ "python3" ]
+CMD [ "src/docker_exps/app/app_train.py" ]
+

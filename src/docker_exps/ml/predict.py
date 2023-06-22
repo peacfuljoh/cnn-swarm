@@ -1,15 +1,13 @@
 
-from typing import List, Union
+from typing import List
 import os
-
-import numpy as np
 
 import torch
 
 from ossr_utils.io_utils import load_json
 
 from src.docker_exps.ml.nn_models import NNConvResNetRGB
-from src.docker_exps.app.app_utils import is_existing_model_id
+from src.docker_exps.utils.app_utils import is_existing_model_id
 from src.docker_exps.constants import MODEL_INFO_FPATH, TORCH_MODEL_DIR
 
 
@@ -36,7 +34,6 @@ def predict(net,
         -> torch.Tensor:
     """Perform prediction on examples using specified network. Output type matches 'examples' input type."""
     if 0:
-        import torchvision
         from src.docker_exps.ml.ml_ops import get_cifar10_data
         trainset, testset, trainloader, testloader, data_func = get_cifar10_data(batch_size=3, shuffle=False)
         examples, _ = next(iter(testloader))

@@ -7,8 +7,10 @@ import time
 import torch
 
 from src.docker_exps.ml.nn_utils import eval_classifier_test_acc
-from src.docker_exps.ml.ml_ops import train, get_cifar10_data, init_net, update_model_info_file
+from src.docker_exps.ml.ml_ops import get_cifar10_data, init_net, update_model_info_file
+from src.docker_exps.ml.ml_train import train
 from src.docker_exps.constants import TORCH_MODEL_DIR, MODEL_FILE_EXT
+from src.docker_exps.constants_train import JOB_MSG_QUEUE
 
 
 BATCH_SIZE_CIFAR10 = 64
@@ -17,7 +19,8 @@ BATCH_SIZE_CIFAR10 = 64
 def train_on_cifar10(trainloader: torch.utils.data.Dataset,
                      testloader: torch.utils.data.Dataset,
                      model_id: str,
-                     train_opts_spec: Optional[dict] = None):
+                     train_opts_spec: Optional[dict] = None,
+                     job_id: Optional[int] = None):
     # visualize batch
     if 0:
         vis_cifar10_batch(nrows=8, ncols=8, show=True)
@@ -64,7 +67,7 @@ def train_on_cifar10(trainloader: torch.utils.data.Dataset,
 
     # fit on training set
     train(trainloader, net, criterion, optimizer, num_epochs, board=board, testloader=testloader,
-          scheduler_mode=scheduler_mode, scheduler=scheduler)
+          scheduler_mode=scheduler_mode, scheduler=scheduler, job_id=job_id)
 
     # eval on test set
     eval_classifier_test_acc(testloader, net)
@@ -78,14 +81,24 @@ def train_on_cifar10(trainloader: torch.utils.data.Dataset,
 def train_manager(model_type: str,
                   model_id: str,
                   example_idxs: Optional[List[int]] = None,
-                  train_opts: Optional[dict] = None):
+                  train_opts: Optional[dict] = None,
+                  job_id: Optional[int] = None):
     if model_type == 'NNConvResNetRGB':
         _, _, trainloader, testloader, _ = get_cifar10_data(
             batch_size=BATCH_SIZE_CIFAR10,
             example_idxs_train=example_idxs
         )
-        train_on_cifar10(trainloader, testloader, model_id, train_opts_spec=train_opts)
+        train_on_cifar10(trainloader, testloader, model_id, train_opts_spec=train_opts, job_id=job_id)
         insert_model_info(model_type, model_id, example_idxs, train_opts)
+
+    if job_id is not None:
+        msg_ = dict(
+            type='train_job_complete',
+            data=dict(
+                job_id=job_id
+            )
+        )
+        JOB_MSG_QUEUE.put(msg_)
 
 def insert_model_info(model_type: str,
                       model_id: str,
