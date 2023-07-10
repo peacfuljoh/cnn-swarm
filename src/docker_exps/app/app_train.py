@@ -8,8 +8,7 @@ from threading import Thread
 
 from flask import Flask, jsonify, request
 
-from src.docker_exps.utils.app_utils import is_range_list, is_valid_model_type, is_existing_model_id, \
-    preprocess_train_route_args
+from src.docker_exps.utils.app_utils import preprocess_train_route_args
 from src.docker_exps.ml.train import train_manager
 from src.docker_exps.constants_train import TRAIN_STATUS, JOBS_INIT_INFO, JOB_MSG_QUEUE, TRAIN_TASKS
 
@@ -22,7 +21,7 @@ def train_status_manager():
         job_id = msg['data']['job_id']
         if msg['type'] == 'train_job_complete':
             TRAIN_STATUS['jobs'][job_id]['complete'] = True
-            # del TRAIN_TASKS[job_id] # TODO: enable this?
+            del TRAIN_TASKS[job_id] # TODO: enable this?
         if msg['type'] == 'train_job_update':
             TRAIN_STATUS['jobs'][job_id]['duration'] = msg['data']['duration']
             TRAIN_STATUS['jobs'][job_id]['progress'] = msg['data']['progress']

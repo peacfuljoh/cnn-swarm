@@ -18,10 +18,9 @@ import requests
 
 from ossr_utils.io_utils import save_json, load_json
 
-from src.docker_exps.utils.app_utils import is_range_list, is_valid_model_type, is_existing_model_id, preprocess_train_route_args
+from src.docker_exps.utils.app_utils import is_range_list, preprocess_train_route_args
 from src.docker_exps.constants import CIFAR10_CLASSES, DATASET_NAMES, MODEL_INFO_FPATH, \
     DATASET_SUBSETS
-from src.docker_exps.constants_network import URL_TRAIN_INTERNAL
 from src.docker_exps.ml.ml_ops import get_cifar10_data
 from src.docker_exps.ml.predict import predict_manager
 
@@ -100,7 +99,7 @@ def train():
     if 'exception' in req_info:
         return jsonify(req_info)
     pprint(req_info)
-    res = requests.post(URL_TRAIN_INTERNAL + 'train', json=req_info)
+    res = requests.post(os.environ['URL_TRAIN_INTERNAL'] + 'train', json=req_info)
     dictFromServer = res.json()
     return jsonify(dictFromServer)
 

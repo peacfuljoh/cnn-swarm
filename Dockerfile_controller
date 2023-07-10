@@ -1,5 +1,6 @@
 # Download base image ubuntu 22.04
-FROM ubuntu:22.04
+#FROM ubuntu:22.04
+FROM python:3.9-slim
 
 # author
 MAINTAINER Johannes Traa
@@ -16,19 +17,13 @@ COPY requirements.txt .
 COPY Makefile .
 
 # Install all packages
-RUN apt-get update && \
-    apt-get install -y python3 && \
-    apt install -y python3-pip && \
-	pip install -r requirements.txt
+RUN pip install -r requirements.txt
 
 # Copy Python code
 COPY src/docker_exps src/docker_exps
 
 # Define env variables
 ENV PYTHONPATH=/code
-ENV HOME_DIR=/home
-ENV FLASK_CONTROLLER_HOST="0.0.0.0"
-ENV FLASK_CONTROLLER_PORT="48515"
 
 # Run python process
 ENTRYPOINT [ "python3" ]

@@ -7,7 +7,14 @@ from threading import Thread
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.docker_exps.constants_network import URL_CONTROLLER, URL_TRAIN
+
+
+URL_BASE = 'http://127.0.0.1'
+PORT_CONTROLLER = 48515
+PORT_TRAIN = 48516
+
+URL_CONTROLLER = URL_BASE + ':' + str(PORT_CONTROLLER) + '/'
+URL_TRAIN = URL_BASE + ':' + str(PORT_TRAIN) + '/'
 
 
 
@@ -63,15 +70,15 @@ def main_train():
             model_type="NNConvResNetRGB",
             model_id=model_id,
             example_idxs=[0, 1000],
-            train_opts=dict(num_epochs=80)
+            train_opts=dict(num_epochs=2)
         )
         res = requests.post(URL_CONTROLLER + 'train', json=dictToSend)
         dictFromServer = res.json()
         pprint(dictFromServer)
 
-    # start_job()
-    # time.sleep(60)
-    # start_job()
+    start_job()
+    time.sleep(60)
+    start_job()
 
 def main_model_info():
     res = requests.get(URL_CONTROLLER + 'get_model_info').json()
@@ -84,3 +91,4 @@ if __name__ == '__main__':
     # main_predict()
     main_train()
     # main_model_info()
+
