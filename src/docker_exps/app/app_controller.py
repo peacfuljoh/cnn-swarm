@@ -8,9 +8,12 @@ Example to post data:
     curl -X POST http://10.0.0.34:48513/get_example -H 'Content-Type: application/json' -d '{"example_id":5}'
 """
 
-from typing import Union, List
+from typing import Union, List, Optional
 import os
 from pprint import pprint
+import time
+from threading import Thread
+import copy
 
 import numpy as np
 from flask import Flask, jsonify, request
@@ -25,19 +28,84 @@ from src.docker_exps.ml.ml_ops import get_cifar10_data
 from src.docker_exps.ml.predict import predict_manager
 
 
-CONTROLLER_STATUS = dict(
-    train_jobs=[],
-    predict_jobs=[],
-    nodes=dict(
-        train=[],
-        pred=[]
-    )
-)
-
-
 # init model info file if it doesn't exist
 if not os.path.exists(MODEL_INFO_FPATH):
     save_json(MODEL_INFO_FPATH, {})
+
+
+
+def init_controller_status():
+    return dict(
+        train_jobs=[]
+    )
+
+def train_get_req(url: str,
+                  timeout: Optional[float] = None,
+                  placeholder = None,
+                  verbose: int = 0):
+    """Issue get request to training endpoint, return placeholder upon failure"""
+    try:
+        return requests.get(url, timeout=timeout).json()
+    except:
+        if verbose >= 1:
+            print('train_get_req() failed at url: ' + url)
+        return placeholder
+
+def get_next_train_base_url_idx(train_base_urls: List[str]) -> int:
+    train_job_counts = [100 for _ in range(len(train_base_urls))]
+    for i, url in enumerate(train_base_urls):
+        train_job_info = train_get_req(url + 'status', timeout=1.0)
+        if train_job_info is not None:
+            train_job_counts[i] = len(train_job_info['jobs'])
+    url_idx = np.argmin(train_job_counts)
+    return url_idx
+
+
+
+TRAIN_URLS = []
+
+def scan_train_ips():
+    """Scan continuously for train node IP addresses by calling 'type' endpoint"""
+    global TRAIN_URLS
+
+    url_base = 'http://{}.'.format(os.environ['SUBNET_TRAIN'])
+
+    while 1:
+        t0 = time.time()
+
+        train_urls_new = []
+        for i in range(1, 255):
+            url_ = url_base + str(i) + ':' + os.environ['FLASK_TRAIN_PORT'] + '/'
+            url_full = url_ + 'type'
+            resp = train_get_req(url_full, timeout=0.05)
+            if resp is not None and resp['type'] == 'train':
+                train_urls_new.append(url_)
+
+        TRAIN_URLS = copy.copy(train_urls_new)
+
+        t_rest = 5 - (time.time() - t0)
+        if t_rest > 0:
+            time.sleep(t_rest)
+
+scan_train_ips_thread = Thread(target=scan_train_ips, daemon=True)
+scan_train_ips_thread.start()
+
+# def get_train_node_ips() -> List[str]:
+#     """Get train node IP addresses by calling 'type' endpoint"""
+#     url_base = 'http://{}.'.format(os.environ['SUBNET_TRAIN'])
+#     ips = []
+#     for i in range(1, 255):
+#         url_ = url_base + str(i) + ':' + os.environ['FLASK_TRAIN_PORT'] + '/'
+#         url_full = url_ + 'type'
+#         resp = train_get_req(url_full, timeout=0.01)
+#         if resp is not None and resp['type'] == 'train':
+#             ips.append(url_)
+#     return ips
+
+
+
+
+
 
 
 app = Flask(__name__)
@@ -48,7 +116,16 @@ def home():
 
 @app.route('/status')
 def status():
+    CONTROLLER_STATUS = init_controller_status()
+    for train_base_url_ in TRAIN_URLS:
+        train_job_info = train_get_req(train_base_url_ + 'status', timeout=1.0, placeholder={}, verbose=1)
+        train_job_info['url'] = train_base_url_
+        CONTROLLER_STATUS['train_jobs'].append(train_job_info)
     return jsonify(CONTROLLER_STATUS)
+
+@app.route('/type')
+def type():
+    return jsonify(dict(type='controller'))
 
 @app.route('/get_examples', methods=['POST'])
 def get_example():
@@ -99,8 +176,14 @@ def train():
     if 'exception' in req_info:
         return jsonify(req_info)
     pprint(req_info)
-    res = requests.post(os.environ['URL_TRAIN_INTERNAL'] + 'train', json=req_info)
-    dictFromServer = res.json()
+
+    train_base_urls = copy.copy(TRAIN_URLS)
+    if train_base_urls:
+        url_idx = get_next_train_base_url_idx(train_base_urls)
+        url_ = train_base_urls[url_idx]
+        dictFromServer = requests.post(url_ + 'train', json=req_info).json()
+    else:
+        dictFromServer = dict(exception='TrainInitFailed')
     return jsonify(dictFromServer)
 
 @app.route('/predict', methods=['POST'])

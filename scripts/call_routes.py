@@ -54,10 +54,10 @@ def main_train():
     # status
     def check_status():
         while 1:
-            res = requests.get(URL_TRAIN + 'status').json()
+            res = requests.get(URL_CONTROLLER + 'status').json()
             pprint(res)
-            if (len(res['jobs']) > 0) and all([r['complete'] for r in res['jobs'].values()]):
-                break
+            # if (len(res['jobs']) > 0) and all([r['complete'] for r in res['jobs'].values()]):
+            #     break
             time.sleep(10)
     check_status_thread = Thread(target=check_status)
     check_status_thread.start()
@@ -76,9 +76,11 @@ def main_train():
         dictFromServer = res.json()
         pprint(dictFromServer)
 
-    start_job()
-    time.sleep(60)
-    start_job()
+    if 1:
+        start_job()
+        for i in range(5):
+            time.sleep(30)
+            start_job()
 
 def main_model_info():
     res = requests.get(URL_CONTROLLER + 'get_model_info').json()
@@ -91,4 +93,3 @@ if __name__ == '__main__':
     # main_predict()
     main_train()
     # main_model_info()
-

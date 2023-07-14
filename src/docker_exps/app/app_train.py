@@ -43,6 +43,10 @@ def status():
     print(TRAIN_STATUS)
     return jsonify(TRAIN_STATUS)
 
+@app.route('/type')
+def type():
+    return jsonify(dict(type='train'))
+
 @app.route('/train', methods=['POST'])
 def train():
     req_info = request.get_json(force=True)
