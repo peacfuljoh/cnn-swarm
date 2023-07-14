@@ -14,7 +14,8 @@ services:
       FLASK_CONTROLLER_HOST: 0.0.0.0
       FLASK_CONTROLLER_PORT: 48515
       HOME_DIR: /home
-      URL_TRAIN_INTERNAL: http://ml_train:48516/
+      FLASK_TRAIN_PORT: 48516
+      SUBNET_TRAIN: 30.0.0
     networks:
       - MLNetwork
 
@@ -23,8 +24,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile_train
-    ports:
-      - 48516:48516
+#    ports:
+#      - 48516:48516
     volumes:
       - /home/nuc/docker_exps_home_dir:/home
     environment:
