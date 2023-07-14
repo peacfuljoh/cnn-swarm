@@ -54,7 +54,10 @@ def main_train():
     # status
     def check_status():
         while 1:
-            res = requests.get(URL_CONTROLLER + 'status').json()
+            try:
+                res = requests.get(URL_CONTROLLER + 'status').json()
+            except:
+                res = {}
             pprint(res)
             # if (len(res['jobs']) > 0) and all([r['complete'] for r in res['jobs'].values()]):
             #     break
@@ -72,9 +75,13 @@ def main_train():
             example_idxs=[0, 1000],
             train_opts=dict(num_epochs=2)
         )
-        res = requests.post(URL_CONTROLLER + 'train', json=dictToSend)
-        dictFromServer = res.json()
+        try:
+            res = requests.post(URL_CONTROLLER + 'train', json=dictToSend)
+            dictFromServer = res.json()
+        except:
+            dictFromServer = {}
         pprint(dictFromServer)
+
 
     if 1:
         start_job()

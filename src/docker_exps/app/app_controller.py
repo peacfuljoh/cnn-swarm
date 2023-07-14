@@ -67,6 +67,7 @@ TRAIN_URLS = []
 def scan_train_ips():
     """Scan continuously for train node IP addresses by calling 'type' endpoint"""
     global TRAIN_URLS
+    max_ip_list_refresh_dur = 5 # seconds
 
     url_base = 'http://{}.'.format(os.environ['SUBNET_TRAIN'])
 
@@ -83,7 +84,7 @@ def scan_train_ips():
 
         TRAIN_URLS = copy.copy(train_urls_new)
 
-        t_rest = 5 - (time.time() - t0)
+        t_rest = max_ip_list_refresh_dur - (time.time() - t0)
         if t_rest > 0:
             time.sleep(t_rest)
 
