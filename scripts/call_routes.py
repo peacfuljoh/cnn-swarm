@@ -85,7 +85,7 @@ def main_train():
 
     if 1:
         start_job()
-        for i in range(5):
+        for i in range(3):
             time.sleep(30)
             start_job()
 

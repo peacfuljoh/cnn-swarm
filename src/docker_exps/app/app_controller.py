@@ -52,8 +52,10 @@ def train_get_req(url: str,
         return placeholder
 
 def get_next_train_base_url_idx(train_base_urls: List[str]) -> int:
-    train_job_counts = [100 for _ in range(len(train_base_urls))]
-    for i, url in enumerate(train_base_urls):
+    train_base_urls_perm = [train_base_urls[i] for i in np.random.permutation(train_base_urls)]
+    num_urls = len(train_base_urls_perm)
+    train_job_counts = [100 for _ in range(num_urls)]
+    for i, url in enumerate(train_base_urls_perm):
         train_job_info = train_get_req(url + 'status', timeout=1.0)
         if train_job_info is not None:
             train_job_counts[i] = len(train_job_info['jobs'])
