@@ -117,12 +117,14 @@ See https://docs.docker.com/engine/swarm/networking/.
 
 It is possible to start a service from a docker-compose.yml file, in which case we call it a stack: 
 `docker stack deploy --compose-file docker-service-controller.yml s`. However, we can't scale the controller and 
-trainer tasks separately that way. Instead, we start the trainer directly with the desired number of replicas 
-(that we can also scale up and down after-the-fact):
+trainer tasks separately that way. Instead, we start the trainer directly with the desired number of replicas. 
+We can also scale up and down the number of replicas after-the-fact as desired.
+
+To start the trainer service:
 
 `docker service create --mount type=bind,source=/home/nuc/docker_exps_home_dir,target=/home --name ml_train --network MLNetwork -e FLASK_TRAIN_HOST=0.0.0.0 -e FLASK_TRAIN_PORT=48516 -e HOME_DIR=/home --replicas 4 docker-exps-ml_train`
 
-We similarly start the controller service: 
+To start the controller service: 
 
 `docker service create --mount type=bind,source=/home/nuc/docker_exps_home_dir,target=/home --name ml_controller --network MLNetwork -e FLASK_CONTROLLER_HOST=0.0.0.0 -e FLASK_CONTROLLER_PORT=48515 -e HOME_DIR=/home -e FLASK_TRAIN_PORT=48516 -e SUBNET_TRAIN=30.0.0 -p 48515:48515 docker-exps-ml_controller`
 
@@ -169,9 +171,18 @@ Maintain an up-to-date list of all containers running inside swarm services and 
 
 # Conclusion
 
-This serves as a MWE of an ML pipeline (from training to serving) implemented with Docker. Other useful functionality 
-could be added such as:
+This serves as a MWE of an ML pipeline (from training to serving) implemented with Docker.
+
+Learnings:
+- Docker CLI commands: `build`, `run`, `compose`, `network`, `service`, `image`, `container`
+- Dockerfiles: prioritizing lightweight image via least-changed/slowest ops first, appropriate base image, multi-stage build
+- Networking: creating a bridge or overlay network, connecting containers to them, how IP addresses are assigned, port binding
+- Compose: combining Dockerfiles into a single compose .yml file for one-line launch of container stacks with networking
+- Swarm: scaling a one-container app to a swarm service with replicas automatically maintained across multiple nodes
+- Flask: implementing a network of web apps for managing and running ML jobs
+
+TODO:
 - MLOps automation and metadata storage, e.g. to avoid loss of progress when a trainer node goes down while running a job
-- More routes on the controller and train apps for increased control of jobs
-- Multiple controller apps for redundancy and scaling (controller currently handles all `predict` requests)
+- More routes on the controller and trainer apps for increased control of jobs and status info
+- Multiple controller apps for redundancy and scaling (controller currently handles all `predict` requests), perhaps as a global service (i.e. one on each node)
 
