@@ -1,4 +1,4 @@
-# docker-exps
+# Docker experiments
 
 This repository shows how to use Docker to set up a horizontally scalable ML service for training and serving 
 ConvNet-based image classification using PyTorch.
