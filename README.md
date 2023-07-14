@@ -3,15 +3,16 @@
 This repository shows how to use Docker to set up a horizontally scalable ML service for training and serving 
 ConvNet-based image classification using PyTorch.
 
-
-# Image classification system
-
 This service has two components:
 - controller: a Flask app that responds to `train` and `predict` requests.
 - trainer: one or more Flask apps that run training jobs and respond to `train` requests.
 
 These are run as stand-alone containers or more conveniently orchestrated as a swarm. 
 There can be any number of trainer apps but only one controller app (at the moment).
+
+A notable aspect of this system is that container/service orchestration is handled with Docker while responding to
+external `train` and `predict` requests is handled by the Flask apps themselves. Docker is indifferent to the content
+of the containers. It just maintains a desired state.
 
 
 ## Stand-alone containers
@@ -68,7 +69,8 @@ Build and run as with the controller, except with different env vars (see `docke
 
 ## Docker compose
 
-Instead of building and running containers individually, we can use Docker compose to automate everything.
+Instead of building and running containers individually, we can use Docker compose to automate everything 
+(see https://docs.docker.com/compose/gettingstarted/).
 
 Specify all options in `docker-compose.yml` in the repo root including all CLI args.
 
@@ -92,6 +94,8 @@ A docker swarm simplifies horizontal scaling by allowing us to create a `ml_trai
 with any number of replicas. Each one will be assigned a new IP address that the `ml_controller` service
 can scan for to know what trainer containers are available at any time.
 
+See https://docs.docker.com/engine/swarm/.
+
 ### Swarm init
 
 Initialize swarm on current node (which is a manager): 
@@ -107,6 +111,7 @@ Create an overlay network for containers to communicate over:
 `docker network create --driver overlay --subnet 30.0.0.0/24 MLNetwork`
 
 Swarms use overlay networks while stand-alone containers use bridge networks.
+See https://docs.docker.com/engine/swarm/networking/.
 
 ### Start services
 
